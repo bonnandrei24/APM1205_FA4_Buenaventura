@@ -1,0 +1,137 @@
+---
+title: "APM1205: Formative Assessment 4"
+subtitle: "Dummy-Variable Regression Using Real World Data"
+author: "Bonn Andrei M. Buenaventura"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# Setting echo = FALSE ensures the R code is hidden in the final PDF, 
+# while still running the models and displaying the text and plots.
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+library(ggplot2)
+data(diamonds)
+```
+
+## Part A. Exploring and Preparing the Data
+
+**1. Observations and Variables**
+The `diamonds` dataset contains **53,940 observations** and **10 variables**.
+
+**2. Response Variable**
+* **Response variable ($Y$):** `price`
+* **Measurement:** This continuous numeric variable measures the price of the diamond in US dollars.
+
+**3. Quantitative Explanatory Variable**
+* **Quantitative predictor ($X$):** `carat`
+* **Measurement:** This continuous numeric variable measures the physical weight of the diamond.
+
+**4. Categorical Explanatory Variable**
+* **Categorical predictor:** `cut`
+* **Categories:** Fair, Good, Very Good, Premium, and Ideal.
+
+**5. Selection of Reference Category**
+* **Selected Reference Category:** `Fair`
+* **Rationale:** A reference category is mathematically necessary to prevent exact multicollinearity, known as the dummy variable trap. If an intercept is included alongside dummy indicators for every single category, the sum of the dummy variables perfectly equals the intercept column of ones. This makes the design matrix singular and impossible to invert, preventing the calculation of unique regression coefficients. Omitting one category establishes a baseline.
+
+---
+
+## Part B. Constructing Dummy Variables
+
+**1. Dummy-Variable Coding Table**
+Using **Fair** as the reference category, we construct four dummy variables:
+
+| Cut Category | $D_1$ (Good) | $D_2$ (Very Good) | $D_3$ (Premium) | $D_4$ (Ideal) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Fair** (Reference) | 0 | 0 | 0 | 0 |
+| **Good** | 1 | 0 | 0 | 0 |
+| **Very Good** | 0 | 1 | 0 | 0 |
+| **Premium** | 0 | 0 | 1 | 0 |
+| **Ideal** | 0 | 0 | 0 | 1 |
+
+**2. Meaning of the All-Zero Category**
+The category where all dummy variables equal zero ($D_1=0, D_2=0, D_3=0, D_4=0$) represents the baseline reference group, which is **Fair**. For this category, all categorical contrast terms cancel out, meaning the regression intercept strictly represents the expected baseline price for a Fair-cut diamond (when carat weight is hypothetically zero).
+
+**3. The Danger of Five Dummy Variables**
+If five dummy variables were included alongside an intercept, it would introduce perfect linear dependence. Because every diamond belongs to exactly one cut category, the sum of the five dummy columns would always equal 1, which is identical to the constant intercept column. This rank-deficient matrix cannot be solved via Ordinary Least Squares.
+
+---
+
+## Part C. Additive Dummy-Variable Regression
+
+```{r fit_model1}
+model1 <- lm(price ~ carat + cut, data = diamonds)
+```
+
+**1. Estimated Regression Equation**
+Based on the additive model output, the estimated regression equation is:
+$$\widehat{\text{Price}} = -3875.47 + 7871.08(\text{Carat}) + 679.53(D_1) + 1111.46(D_2) + 828.65(D_3) + 1800.92(D_4)$$
+
+**2. Interpretation of the Carat Coefficient**
+Holding the diamond's cut quality constant, the diamond price is estimated to increase by **\$7,871.08** on average for each additional 1-carat increase in weight.
+
+**3. Interpretation of a Dummy-Variable Coefficient**
+Looking at the coefficient for $D_4$ (Ideal cut): Holding the carat weight constant, an **Ideal-cut** diamond is predicted to cost **\$1,800.92 more** on average than a **Fair-cut** diamond (the baseline reference).
+
+**4. Interpretation of $R^2$**
+The additive model yields an $R^2$ of approximately **0.8565**. This indicates that **85.65%** of the total variation in diamond prices is successfully explained by the linear combination of the diamond's carat weight and its cut quality.
+
+**5. Regression Line Slopes in the Additive Model**
+In this additive model, the regression lines for the different cut categories have the **exact same slope**. The additive specification assumes the effect of carat weight on price is identical across all cuts, varying only the $Y$-intercepts to create five parallel regression lines.
+
+---
+
+## Part D. Interaction Between Carat and Cut
+
+```{r fit_model2}
+model2 <- lm(price ~ carat * cut, data = diamonds)
+```
+
+**1. Hypotheses for the Overall Interaction**
+* **Null Hypothesis ($H_0$):** The effect of carat on price does not depend on the cut. (The interaction coefficients $\delta_1 = \delta_2 = \delta_3 = \delta_4 = 0$; the slopes are equal).
+* **Alternative Hypothesis ($H_1$):** The effect of carat on price depends on the cut. (At least one interaction coefficient $\delta_j \ne 0$; the slopes differ).
+
+**2. Interaction Coefficients and P-values**
+From the interaction model summary, the coefficients for the interaction terms (relative to Fair) are:
+* `carat:cutGood` ($\hat{\delta}_1$): $705.55$ ($p < 0.001$)
+* `carat:cutVery Good` ($\hat{\delta}_2$): $1205.63$ ($p < 0.001$)
+* `carat:cutPremium` ($\hat{\delta}_3$): $1048.85$ ($p < 0.001$)
+* `carat:cutIdeal` ($\hat{\delta}_4$): $1993.83$ ($p < 0.001$)
+
+**3. ANOVA / Incremental F-test**
+Comparing Model 1 (Additive) and Model 2 (Interaction):
+* **Degrees of freedom difference:** 4
+* **Sum of Squares difference:** $3.1027 \times 10^9$
+* **F-statistic:** 176.26
+* **P-value:** $< 2.2 \times 10^{-16}$
+
+**4. Statistical Decision and Contextual Meaning**
+At $\alpha = 0.05$, because the p-value ($< 0.001$) is strictly less than the significance level, we **reject the null hypothesis**. In the context of diamond prices, this provides overwhelming evidence that the premium paid per carat is not constant; the price of a diamond accelerates at different rates depending on its cut quality.
+
+**5. Practical Difference**
+Practically, the additive model forces the rate of price increase to remain constant across all cut categories (parallel lines). The interaction model allows each cut category to have its own unique slope, reflecting the real-world market reality that a 1-carat increase in an Ideal diamond adds much more value than a 1-carat increase in a Fair diamond.
+
+---
+
+## Part E. Visualization and Statistical Conclusion
+
+```{r plot_interaction, fig.align='center', fig.width=6.5, fig.height=4.5, out.width="100%"}
+ggplot(diamonds, aes(x = carat, y = price, color = cut)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Diamond Price versus Carat by Cut",
+    x = "Carat",
+    y = "Price (US Dollars)",
+    color = "Cut Quality"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom") # Moves legend to the bottom to prevent horizontal clipping
+```
+
+### Statistical Conclusion
+The regression analysis confirms a strong, positive relationship between a diamond's carat weight and its price, indicating that weight is a primary driver of market valuation. The categorical cut variable plays a significant moderating role in this dynamic. By utilizing dummy variables, we established baseline price differences, proving that superior cuts command higher starting values relative to Fair-cut diamonds. Crucially, the highly significant interaction effect ($F = 176.26, p < 0.001$) demonstrates that the effect of carat weight on price differs fundamentally across cut categories. The non-parallel regression lines in our visualization reveal that higher-quality cuts (like Ideal) appreciate much faster per carat than lower-quality cuts. Ultimately, this suggests that diamond pricing is heavily interactive: buyers pay a compounding premium when high weight and superior cut quality are combined.
